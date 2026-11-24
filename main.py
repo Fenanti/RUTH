@@ -452,10 +452,9 @@ class SagraApp(ctk.CTk):
 
             self.daily_summaries = summaries
 
-            self.after(
-                0,
-                lambda: self._set_status(f"Caricate {len(summaries)} serate.")
-            )
+            n = len(summaries)
+            msg = f"Caricata {n} serata." if n == 1 else f"Caricate {n} serate."
+            self.after(0, lambda: self._set_status(msg))
 
             self.after(0, self._render_summaries)
 
