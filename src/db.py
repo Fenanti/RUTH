@@ -13,9 +13,9 @@ import sqlite3
 from .models import AggregatedRow, DailySummary
 
 try:
-    import psycopg
-    from psycopg import errors as pg_errors
-    from psycopg.rows import dict_row
+    import psycopg  # type: ignore
+    from psycopg import errors as pg_errors  # type: ignore
+    from psycopg.rows import dict_row  # type: ignore
 
     HAS_PSYCOPG = True
 except ImportError:
@@ -254,7 +254,6 @@ def fetch_daily_summaries(db_url: str) -> list[DailySummary]:
 
     result.sort(key=lambda s: s.data_serata, reverse=True)
     return result
-
 
 def fetch_aggregated_rows_for_date(db_url: str, pattern: str) -> list[AggregatedRow]:
     """

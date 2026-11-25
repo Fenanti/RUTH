@@ -1,0 +1,12 @@
+# Configurazione Ruff per il progetto StampaChiusura
+
+[lint]
+# Regole da ignorare perché non applicabili a questa app desktop
+ignore = [
+    "BLE001",   # blind except: vogliamo catturare Exception per mostrare errori all'utente
+    "S110",     # try-except-pass: va bene per cleanup silenziosi (es. rimozione file temp)
+]
+
+# Ordina automaticamente gli import quando formatti
+[lint.isort]
+known-first-party = ["src"]
