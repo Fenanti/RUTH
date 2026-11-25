@@ -1,3 +1,4 @@
+#25/11/2026
 customtkinter>=6.0.0
 requests>=2.34.0
 pywin32>=312

@@ -1,3 +1,4 @@
+#25/11/2026
 @echo off
 echo ====================================
 echo   Compilazione StampaChiusura.exe

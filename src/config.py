@@ -1,3 +1,4 @@
+#25/11/2026
 """
 Gestione configurazione dell'applicazione.
 Supporta SQLite (locale/NAS) e PostgreSQL (multicassa in rete).

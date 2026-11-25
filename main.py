@@ -1,3 +1,4 @@
+#25/11/2026
 """
 Stand Gastronomico - Totali Serata
 Conversione Python dell'applicazione Rust (egui/eframe -> CustomTkinter).

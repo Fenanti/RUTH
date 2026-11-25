@@ -1,3 +1,4 @@
+#25/11/2026
 """
 Accesso dati dual-driver: SQLite (locale/NAS) e PostgreSQL (multicassa).
 Equivalente di db.rs che usava sqlx::AnyPool.

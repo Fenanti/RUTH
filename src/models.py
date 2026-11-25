@@ -1,3 +1,4 @@
+#25/11/2026
 """
 Modelli dati dell'applicazione.
 """

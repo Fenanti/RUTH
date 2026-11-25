@@ -1,4 +1,5 @@
 # Configurazione Ruff per il progetto StampaChiusura
+#25/11/2026
 
 [lint]
 # Regole da ignorare perché non applicabili a questa app desktop
