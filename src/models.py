@@ -1,8 +1,7 @@
 """
-Modelli dati per l'API Gemini.
-Equivalent to model.rs
+Modelli dati dell'applicazione.
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass
@@ -16,40 +15,3 @@ class DailySummary:
 class AggregatedRow:
     descrizione: str
     quantita_totale: int
-
-
-# --- Modelli API Gemini ---
-
-@dataclass
-class Part:
-    text: str
-
-
-@dataclass
-class Content:
-    parts: list[Part] = field(default_factory=list)
-
-
-@dataclass
-class RequestBody:
-    contents: list[Content] = field(default_factory=list)
-
-
-@dataclass
-class ResponsePart:
-    text: str
-
-
-@dataclass
-class ResponseContent:
-    parts: list[ResponsePart] = field(default_factory=list)
-
-
-@dataclass
-class Candidate:
-    content: ResponseContent
-
-
-@dataclass
-class ApiResponse:
-    candidates: list[Candidate] | None = None

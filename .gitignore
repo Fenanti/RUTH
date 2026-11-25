@@ -11,7 +11,7 @@ dist/
 build/
 
 # IDE
-.vscode/settings.json
+.vscode/
 
 # OS
 Thumbs.db
