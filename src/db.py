@@ -1,11 +1,11 @@
-#25/11/2026
 """
 Accesso dati dual-driver: SQLite (locale/NAS) e PostgreSQL (multicassa).
 Equivalente di db.rs che usava sqlx::AnyPool.
 
-L'URL decide il driver:
+L'URL in configurazione decide il driver:
   sqlite:///C:\\sagra\\database.db
   sqlite:///W:\\sagra\\databaseNAS.db?check_same_thread=False
+  sqlite:///\\\\server\\sagra\\database.db
   postgresql://sagra:sagra@192.168.1.50:5432/sagra
 """
 import os
@@ -13,17 +13,22 @@ import sqlite3
 
 from .models import AggregatedRow, DailySummary
 
+# Cattura il VERO motivo per cui psycopg non si importa
+# (es. modulo mancante, DLL assente nell'exe, ecc.)
+PSYCOPG_IMPORT_ERROR = ""
+
 try:
-    import psycopg  # type: ignore
-    from psycopg import errors as pg_errors  # type: ignore
-    from psycopg.rows import dict_row  # type: ignore
+    import psycopg
+    from psycopg import errors as pg_errors
+    from psycopg.rows import dict_row
 
     HAS_PSYCOPG = True
-except ImportError:
+except ImportError as e:
     psycopg = None
     pg_errors = None
     dict_row = None
     HAS_PSYCOPG = False
+    PSYCOPG_IMPORT_ERROR = str(e)
 
 
 POSTGRES_PREFIXES = ("postgresql://", "postgres://", "postgresql+psycopg://")
@@ -35,7 +40,7 @@ CONNECT_TIMEOUT = 8
 # ======================================================================
 
 def is_postgres_url(db_url: str) -> bool:
-    """True se l'URL è PostgreSQL."""
+    """True se l'URL punta a PostgreSQL."""
     return (db_url or "").strip().lower().startswith(POSTGRES_PREFIXES)
 
 
@@ -44,9 +49,11 @@ def postgres_conninfo(db_url: str) -> str:
     url = (db_url or "").strip()
     lowered = url.lower()
 
+    # Formato SQLAlchemy: postgresql+psycopg://...
     if lowered.startswith("postgresql+psycopg://"):
         return "postgresql://" + url[len("postgresql+psycopg://"):]
 
+    # Formato corto: postgres://...
     if lowered.startswith("postgres://"):
         return "postgresql://" + url[len("postgres://"):]
 
@@ -57,11 +64,11 @@ def sqlite_path_from_url(db_url: str) -> str:
     """
     Estrae il percorso file da un URL SQLite.
     Gestisce i parametri ?check_same_thread=False (stringhe del manuale GSG)
-    e i percorsi UNC di rete/NAS.
+    e i percorsi UNC di rete/NAS (sqlite:///\\\\server\\share\\db.db).
     """
     url = (db_url or "").strip()
 
-    # Rimuove la query string: sqlite:///W:\...db?check_same_thread=False
+    # Rimuove la query string: sqlite:///W:\\...db?check_same_thread=False
     url = url.split("?", 1)[0]
 
     lowered = url.lower()
@@ -77,7 +84,10 @@ def sqlite_path_from_url(db_url: str) -> str:
 # ======================================================================
 
 def _to_float(value) -> float:
-    """Parsing monetario robusto (int, float, Decimal, stringa con virgola)."""
+    """
+    Parsing monetario robusto.
+    Accetta int, float, Decimal (PostgreSQL numeric), stringhe con virgola.
+    """
     if value is None:
         return 0.0
 
@@ -93,7 +103,7 @@ def _to_float(value) -> float:
 
 
 def _to_int(value) -> int:
-    """Conversione robusta a intero."""
+    """Conversione robusta a intero (gestisce Decimal di PostgreSQL)."""
     if value is None:
         return 0
 
@@ -114,7 +124,7 @@ def _to_int(value) -> int:
 
 def connect(db_url: str):
     """
-    Apre una connessione e restituisce (connessione, is_postgres).
+    Apre una connessione e restituisce la tupla (connessione, is_postgres).
     Equivalente di db::create_pool() in Rust.
     """
     db_url = (db_url or "").strip()
@@ -126,8 +136,10 @@ def connect(db_url: str):
     if is_postgres_url(db_url):
         if not HAS_PSYCOPG:
             raise RuntimeError(
-                'Driver PostgreSQL mancante. Installa con: '
-                'python -m pip install "psycopg[binary]"'
+                f"Driver PostgreSQL mancante ({PSYCOPG_IMPORT_ERROR}). "
+                'Installa con: python -m pip install "psycopg[binary]"; '
+                "se stai usando l'exe, ricompilalo con "
+                "--collect-all psycopg_binary"
             )
 
         conn = psycopg.connect(
@@ -135,7 +147,7 @@ def connect(db_url: str):
             row_factory=dict_row,
             connect_timeout=CONNECT_TIMEOUT,
         )
-        conn.autocommit = True  # solo lettura: niente transazioni appese
+        conn.autocommit = True  # sola lettura: niente transazioni appese
         return conn, True
 
     # ---------- SQLite ----------
@@ -155,8 +167,8 @@ def connect(db_url: str):
 def _run_query(db_url: str, queries: list[str], params: tuple = ()):
     """
     Esegue la prima query che funziona.
-    Su PostgreSQL, se la colonna quotata non esiste, ripiega su quella minuscola
-    (dipende da come è stato creato lo schema in fase di migrazione).
+    Su PostgreSQL, se la colonna quotata non esiste, ripiega su quella
+    minuscola (dipende da come è stato creato lo schema in migrazione).
     """
     conn, is_pg = connect(db_url)
 
@@ -192,10 +204,14 @@ def _run_query(db_url: str, queries: list[str], params: tuple = ()):
 def _summaries_queries(is_pg: bool) -> list[str]:
     """
     Query riepilogo serate.
-    In PostgreSQL gli identificatori mixed-case vanno quotati ("totalePagato"),
-    altrimenti vengono cercati tutti minuscoli.
+    In PostgreSQL gli identificatori mixed-case vanno quotati
+    ("totalePagato"), altrimenti vengono cercati tutti minuscoli.
     """
-    base = "SELECT CAST(o.serata AS TEXT) AS serata, {} AS totale_pagato FROM ordini o"
+    base = (
+        "SELECT CAST(o.serata AS TEXT) AS serata, "
+        "{} AS totale_pagato "
+        "FROM ordini o"
+    )
 
     if is_pg:
         return [
@@ -207,7 +223,7 @@ def _summaries_queries(is_pg: bool) -> list[str]:
 
 
 def _aggregated_query(is_pg: bool) -> str:
-    """Query distinta articoli. Placeholder: %s per PostgreSQL, ? per SQLite."""
+    """Query distinta articoli. Placeholder: %s PostgreSQL, ? SQLite."""
     ph = "%s" if is_pg else "?"
 
     return f"""
@@ -255,6 +271,7 @@ def fetch_daily_summaries(db_url: str) -> list[DailySummary]:
 
     result.sort(key=lambda s: s.data_serata, reverse=True)
     return result
+
 
 def fetch_aggregated_rows_for_date(db_url: str, pattern: str) -> list[AggregatedRow]:
     """
